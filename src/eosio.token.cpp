@@ -214,12 +214,13 @@ void token::pos(name owner, const symbol& symbol)
 
   const auto& p = pos_acnts.get( sym.code().raw(), "no stake object found" );
   auto stake = p.stake.amount;
-  auto age   = now() - p.timestamp;
+  auto age   = (now() - p.timestamp) / (24); // Set it as 3600*24 (One Day) on mainnet
+  age = age > 365 ? 365:age;
 
-  if (stake > 0 && age >= 3600*24/3600) {
+  if (stake > 0 && age >= 1) {
     asset get;
     get.symbol = symbol;
-    get.amount = int64_t((stake*age)/(3600*24));
+    get.amount = int64_t(stake*age); // TODO : decreacing with the supply
 
     eosio_assert( get.amount <= st.max_supply.amount - st.supply.amount, "quantity exceeds available supply");
 

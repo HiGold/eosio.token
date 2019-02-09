@@ -128,6 +128,7 @@ namespace eosio {
 
          void sub_stake( name owner, asset value );
          void add_stake( name owner, asset value, name ram_payer );
+
    };
 
 } /// namespace eosio

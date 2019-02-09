@@ -210,43 +210,47 @@ void token::pos(name owner, const symbol& symbol)
   eosio_assert( existing != statstable.end(), "token with symbol does not exist, create token before POS" );
   const auto& st = *existing;
 
+  eosio_assert( st.supply.amount < st.max_supply.amount, "token with symbol is reach Max Supply" );
+
   sstats sstatstable( _self, sym.code().raw() );
   auto sexisting = sstatstable.find( sym.code().raw() );
   eosio_assert( sexisting != sstatstable.end(), "token with symbol can not POS" );
 
   require_auth( owner );
 
-  add_stake( owner, asset{0, symbol}, owner );
-
   stakeactns pos_acnts( _self, owner.value );
-  const auto& p = pos_acnts.get( sym.code().raw(), "no stake object found" );
-  
-  double stake  = p.stake.amount;
-  double age    = (now() - p.timestamp) / (24); // Set it as 3600*24 (One Day) on mainnet
-  double supply = st.supply.amount;
-  double remain = st.max_supply.amount-st.supply.amount;
+  auto p = pos_acnts.find( sym.code().raw() );
 
-  age = (age>365.0) ? 365.0 : age;
+  if( p != pos_acnts.end() ) {
+    double stake  = p.stake.amount;
+    double age    = (now() - p.timestamp) / (24); // Set it as 3600*24 (One Day) on mainnet
+    age = (age>365.0) ? 365.0 : age;
 
-  if (stake > 0 && age >= 1) {
-    asset get;
-    get.symbol = symbol;
-    get.amount = int64_t( stake*age*remain / supply );
-    // Decreacing POS with the supply
+    double supply = st.supply.amount;
+    double max    = st.max_supply.amount;
+    double per    = (max-supply)/supply;
+    double out    = stake*age*per;
 
-    eosio_assert( get.amount <= st.max_supply.amount - st.supply.amount, "quantity exceeds available supply");
+    if (stake > 0 && age >= 1) {
+      asset get;
+      get.symbol = symbol;
+      get.amount = int64_t(out);
 
-    statstable.modify( st, same_payer, [&]( auto& s ) {
-      s.supply += get;
-    });
+      eosio_assert( get.amount <= st.max_supply.amount - st.supply.amount, "quantity exceeds available supply");
+      eosio_assert( get.amount > 0, "no available token to get");
 
-    add_balance( owner, get, owner );
+      statstable.modify( st, same_payer, [&]( auto& s ) {
+        s.supply += get;
+      });
+      pos_acnts.modify( p, same_payer, [&]( auto& a ) {
+        a.timestamp = now();
+      });
 
+      add_balance( owner, get, owner );
+
+    };
+    
   };
-
-  pos_acnts.modify( p, owner, [&]( auto& a ) {
-    a.timestamp = now();
-  });
 
 }
 
@@ -281,7 +285,6 @@ void token::buystake( name buyer, asset quantity )
 
   eosio_assert( bought.amount > 0, "need a bigger quantity");
 
-  pos( buyer, quantity.symbol );
   sub_balance( buyer, quantity );
   add_stake( buyer, bought, buyer );
 
@@ -312,9 +315,9 @@ void token::sellstake( name seller, asset stake )
 
   stakeactns acnts( _self, seller.value );
   const auto& a = acnts.get( sym.raw(), "no stake object found" );
-  double age   = (now() - a.timestamp) / (24);
+  double age    = (now() - a.timestamp) / (24);
   // Set it as 3600*24 (One Day) on mainnet
-  eosio_assert(age>=3, "need 3 days cool down");
+  eosio_assert(age>=7, "need 7 days cool down");
 
   double R(sst.stakes.amount - stake.amount);
   double C(sst.balance.amount);
@@ -331,7 +334,6 @@ void token::sellstake( name seller, asset stake )
   eosio_assert( get.amount > 0, "need a bigger quantity");
   eosio_assert( get.amount <= sst.balance.amount, "the contract insufficient funds, need a smaller quantity");
 
-  pos(seller, stake.symbol);
   sub_stake( seller, stake );
   add_balance( seller, (get-fee), seller );
 
@@ -364,8 +366,10 @@ void token::add_stake( name owner, asset value, name ram_payer )
         a.timestamp = now();
       });
    } else {
+
       to_acnts.modify( to, same_payer, [&]( auto& a ) {
         a.stake    += value;
+        a.timestamp = now();
       });
    }
 }

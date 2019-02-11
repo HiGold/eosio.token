@@ -219,9 +219,12 @@ void token::pos(name owner, const symbol& symbol)
   require_auth( owner );
 
   stakeactns pos_acnts( _self, owner.value );
-  auto p = pos_acnts.find( sym.code().raw() );
+  auto pos = pos_acnts.find( sym.code().raw() );
 
-  if( p != pos_acnts.end() ) {
+  if( pos != pos_acnts.end() ) {
+
+    const auto& p = pos_acnts.get( sym.code().raw(), "no stake object found" );
+
     double stake  = p.stake.amount;
     double age    = (now() - p.timestamp) / (24); // Set it as 3600*24 (One Day) on mainnet
     age = (age>365.0) ? 365.0 : age;
@@ -249,7 +252,7 @@ void token::pos(name owner, const symbol& symbol)
       add_balance( owner, get, owner );
 
     };
-    
+
   };
 
 }

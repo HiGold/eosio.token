@@ -1,0 +1,16 @@
+{
+  "main": "higoldtokens.cpp",
+  "contract": "higoldtokens",
+  "include": "",
+  "cdt": "",
+  "output": "",
+  "scripts": {
+    "build": ""
+  },
+  "deploy": {
+    "mainnet": "",
+    "kylin": "",
+    "jungle": "",
+    "local": ""
+  }
+}
